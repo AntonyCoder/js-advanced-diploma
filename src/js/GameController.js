@@ -58,11 +58,17 @@ export default class GameController {
     });
   }
 
+  tooltipStatus() {
+    this.gamePlay.addCellEnterListener(this.onCellEnter.bind(this))
+    this.gamePlay.addCellLeaveListener(this.onCellLeave.bind(this))
+  }
+
 
   init() {
-    this.gamePlay.drawUi(themes.prairie);
-    this.generatePositions();
-    this.gamePlay.redrawPositions(this.positions);
+    this.gamePlay.drawUi(themes.prairie); // отрисовка поля
+    this.generatePositions(); // генерация позиции персонажей
+    this.gamePlay.redrawPositions(this.positions); // отрисовка персонажей
+    this.tooltipStatus(); // вывод информации
     // TODO: add event listeners to gamePlay events
     // TODO: load saved stated from stateService
   }
@@ -72,11 +78,25 @@ export default class GameController {
     // TODO: react to click
   }
 
+  showTooltip(character) {
+    const { level, attack, defence, health } = character.character;
+    const message = `🎖${level} ⚔${attack} 🛡${defence} ❤${health}`;
+    return message;
+  }
+
   onCellEnter(index) {
-    // TODO: react to mouse enter
+    const character = this.positions.find((pos) => pos.position === index);
+    if (character) {
+      const message = this.showTooltip(character);
+      this.gamePlay.showCellTooltip(message, index);
+    }
+  }
+
+  createMessage() {
+
   }
 
   onCellLeave(index) {
-    // TODO: react to mouse leave
+    this.gamePlay.hideCellTooltip(index)
   }
 }
