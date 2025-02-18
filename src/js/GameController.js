@@ -7,6 +7,7 @@ import Swordsman from "./characters/Swordsman";
 import Undead from "./characters/Undead";
 import Vampire from "./characters/Vampire";
 import { generateTeam } from "./generators";
+import GamePlay from "./GamePlay";
 
 export default class GameController {
   constructor(gamePlay, stateService) {
@@ -63,19 +64,36 @@ export default class GameController {
     this.gamePlay.addCellLeaveListener(this.onCellLeave.bind(this))
   }
 
+  showBorder(){
+    this.gamePlay.addCellClickListener(this.onCellClick.bind(this))
+  }
+
 
   init() {
     this.gamePlay.drawUi(themes.prairie); // отрисовка поля
     this.generatePositions(); // генерация позиции персонажей
     this.gamePlay.redrawPositions(this.positions); // отрисовка персонажей
     this.tooltipStatus(); // вывод информации
+    this.showBorder();
     // TODO: add event listeners to gamePlay events
     // TODO: load saved stated from stateService
   }
 
 
   onCellClick(index) {
-    // TODO: react to click
+    const characterPlayer = this.positions.find((pos) => pos.position === index);
+    const playerTeam = ['bowman', 'swordsman', 'magician'];
+
+    if(playerTeam.includes(characterPlayer.character.type)){
+      this.gamePlay.selectCell(index);
+      for(let pos of this.positions){
+        if(pos.position !== index){
+          this.gamePlay.deselectCell(pos.position);
+        }
+      }
+    } else {
+      GamePlay.showError('Это персонаж противника!');
+    }
   }
 
   showTooltip(character) {
