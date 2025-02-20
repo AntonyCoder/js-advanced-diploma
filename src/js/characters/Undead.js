@@ -6,6 +6,8 @@ export default class Undead extends Character {
         this.attack = 40;
         this.defence = 10;
         this.type = "undead";
+        this.moveRadius = 4;
+        this.attackRadius = 1;
     }
 }
 
