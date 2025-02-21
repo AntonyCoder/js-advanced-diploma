@@ -9,6 +9,7 @@ import Vampire from "./characters/Vampire";
 import { generateTeam } from "./generators";
 import GamePlay from "./GamePlay";
 import cursors from "./cursors";
+import GameState from "./GameState";
 
 export default class GameController {
   constructor(gamePlay, stateService) {
@@ -16,6 +17,7 @@ export default class GameController {
     this.stateService = stateService;
     this.boardSize = 8;
     this.positions = [];
+    this.gameState = new GameState();
   }
 
   //Генерация позиций игроков
@@ -72,22 +74,42 @@ export default class GameController {
     this.gamePlay.addCellClickListener(this.onCellClick.bind(this));
   }
 
-  //Логика пояления обводки
+  //Действия при нажатии на клетку
   onCellClick(index) {
-    const characterPlayer = this.positions.find((pos) => pos.position === index);
+    //Отображение обводки 
+    const hoveredChar = this.positions.find((pos) => pos.position === index);
+    const selectedChar = this.positions.find((pos) =>
+      this.gamePlay.cells?.[pos.position]?.classList.contains('selected-yellow')
+    );
     const playerTeam = ['bowman', 'swordsman', 'magician'];
+    const enemyTeam = ['daemon', 'undead', 'vampire'];
 
-    if (playerTeam.includes(characterPlayer.character.type)) {
-      this.selectedChar = characterPlayer;
+    if (playerTeam.includes(hoveredChar?.character.type)) {
+      this.selectedChar = hoveredChar;
       this.gamePlay.selectCell(index);
       for (let pos of this.positions) {
         if (pos.position !== index) {
           this.gamePlay.deselectCell(pos.position);
         }
       }
-    } else {
+    } else if (enemyTeam.includes(hoveredChar?.character.type)) {
       GamePlay.showError('Это персонаж противника!');
     }
+
+    //Передвижение персонажа
+    if (selectedChar) {
+      const allowedMoves = this.findMovementRadius(selectedChar.position, selectedChar.character.moveRadius)
+      if (allowedMoves.has(index) && !hoveredChar) {
+        this.gamePlay.deselectCell(selectedChar.position)
+        selectedChar.position = index;
+        this.gamePlay.redrawPositions(this.positions);
+        this.gamePlay.deselectCell(index);
+        this.gameState.switchTurn();
+      }
+    }
+
+    // Атака противника
+
   }
 
   //Логика формирования информации об игроке
@@ -99,36 +121,42 @@ export default class GameController {
 
   // Наведение на ячейку с игроком
   onCellEnter(index) {
-    const hoveredChar = this.positions.find((pos) => pos.position === index);
+    const hoveredChar = this.positions.find((pos) => pos.position === index); // курсор указывает на персонажа
     const selectedChar = this.positions.find((pos) =>
-      this.gamePlay.cells?.[pos.position]?.classList.contains('selected-yellow')
+      this.gamePlay.cells?.[pos.position]?.classList.contains('selected-yellow') // выбран персонаж
     );
 
+    const allowedMoves = this.findMovementRadius(selectedChar?.position, selectedChar?.character.moveRadius) // доступные клетки для передвижения
+    const allowedAttack = this.findAttackRadius(selectedChar?.position, selectedChar?.character.attackRadius)// доступные клетки для атаки
+
+    // показ подсказки
     if (hoveredChar) {
       const message = this.showTooltip(hoveredChar);
       this.gamePlay.showCellTooltip(message, index);
 
-      const isPlayerChar = ['bowman', 'swordsman', 'magician'].includes(hoveredChar.character.type);
+      const isPlayerChar = ['bowman', 'swordsman', 'magician'].includes(hoveredChar.character.type); //Наведение на своего игрока
+      const isEnemyChar = ['daemon', 'undead', 'vampire'].includes(hoveredChar.character.type); //Наведение на противника
 
+      //изменение курсора и появление красной обводки
       if (isPlayerChar) {
         if (selectedChar && selectedChar !== hoveredChar) {
           this.gamePlay.setCursor(cursors.pointer);
         } else {
           this.gamePlay.setCursor(cursors.auto);
         }
-      } else {
-        this.gamePlay.setCursor(cursors.notallowed);
+      } else if (isEnemyChar) {
+        if (allowedAttack.has(index)) {
+          this.gamePlay.selectCell(index, 'red');
+          this.gamePlay.setCursor(cursors.crosshair);
+        } else {
+          this.gamePlay.setCursor(cursors.notallowed);
+        }
       }
+      //Появление зеленой
     } else if (selectedChar) {
-      const allowedMoves = this.findMovementRadius(selectedChar.position, selectedChar.character.moveRadius)
-      const allowedAttack = this.findAttackRadius(selectedChar.position, selectedChar.character.attackRadius)
-
       if (allowedMoves.has(index)) {
         this.gamePlay.selectCell(index, 'green');
         this.gamePlay.setCursor(cursors.pointer);
-      } else if (allowedAttack.has(index) && hoveredChar) {
-        this.gamePlay.selectCell(index, 'red');
-        this.gamePlay.setCursor(cursors.crosshair);
       } else {
         this.gamePlay.setCursor(cursors.notallowed);
       }
