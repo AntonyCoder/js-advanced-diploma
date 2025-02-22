@@ -18,6 +18,8 @@ export default class GameController {
     this.boardSize = 8;
     this.positions = [];
     this.gameState = new GameState();
+    this.selectedChar = null;
+    this.hoveredChar = null;
   }
 
   //Генерация позиций игроков
@@ -63,53 +65,62 @@ export default class GameController {
     });
   }
 
-  // отображение информации об игроке
-  tooltipStatus() {
+  // Действия при наведении и уводе с клетки
+  doHoverActions() {
     this.gamePlay.addCellEnterListener(this.onCellEnter.bind(this));
     this.gamePlay.addCellLeaveListener(this.onCellLeave.bind(this));
   }
 
-  //отображение обводки игрока
-  showBorder() {
+  //Действия при клике на клетку
+  doClickActions() {
     this.gamePlay.addCellClickListener(this.onCellClick.bind(this));
   }
 
   //Действия при нажатии на клетку
   onCellClick(index) {
-    //Отображение обводки 
-    const hoveredChar = this.positions.find((pos) => pos.position === index);
-    const selectedChar = this.positions.find((pos) =>
-      this.gamePlay.cells?.[pos.position]?.classList.contains('selected-yellow')
-    );
-    const playerTeam = ['bowman', 'swordsman', 'magician'];
-    const enemyTeam = ['daemon', 'undead', 'vampire'];
+    this.showBorder(index); //Отображение обводки 
+    this.moveChar(index); //Передвижение персонажа
+    this.attackEnemy(index); // Атака противника
+  }
 
-    if (playerTeam.includes(hoveredChar?.character.type)) {
-      this.selectedChar = hoveredChar;
+  // Отображение обводки игрока
+  showBorder(index) {
+    if (this.isPlayerChar) {
+      this.selectedChar = this.hoveredChar;
       this.gamePlay.selectCell(index);
+
       for (let pos of this.positions) {
         if (pos.position !== index) {
           this.gamePlay.deselectCell(pos.position);
         }
       }
-    } else if (enemyTeam.includes(hoveredChar?.character.type)) {
+    } else if (this.isEnemyChar && !this.allowedAttackCells) {
       GamePlay.showError('Это персонаж противника!');
     }
+  }
 
-    //Передвижение персонажа
-    if (selectedChar) {
-      const allowedMoves = this.findMovementRadius(selectedChar.position, selectedChar.character.moveRadius)
-      if (allowedMoves.has(index) && !hoveredChar) {
-        this.gamePlay.deselectCell(selectedChar.position)
-        selectedChar.position = index;
+  //Движение игрока
+  moveChar(index) {
+    if (this.selectedChar) {
+      const allowedMoves = this.findMovementRadius(this.selectedChar.position, this.selectedChar.character.moveRadius)
+      if (allowedMoves.has(index) && !this.hoveredChar) {
+        this.gamePlay.deselectCell(this.selectedChar.position)
+        this.selectedChar.position = index;
         this.gamePlay.redrawPositions(this.positions);
-        this.gamePlay.deselectCell(index);
+        this.gamePlay.selectCell(this.selectedChar.position);
         this.gameState.switchTurn();
       }
     }
+  }
 
-    // Атака противника
-
+  //Атака противника
+  attackEnemy(index) {
+    if (this.selectedChar && this.isEnemyChar && this.allowedAttackCells.has(index)) {
+      const damage = Math.max(this.selectedChar.character.attack - this.hoveredChar.character.defence, this.selectedChar.character.attack * 0.1)
+      this.hoveredChar.character.health -= damage;
+      const result = this.gamePlay.redrawPositions(this.positions);
+      this.gamePlay.showDamage(index, damage).then(result);
+    }
   }
 
   //Логика формирования информации об игроке
@@ -121,40 +132,37 @@ export default class GameController {
 
   // Наведение на ячейку с игроком
   onCellEnter(index) {
-    const hoveredChar = this.positions.find((pos) => pos.position === index); // курсор указывает на персонажа
-    const selectedChar = this.positions.find((pos) =>
-      this.gamePlay.cells?.[pos.position]?.classList.contains('selected-yellow') // выбран персонаж
-    );
+    this.hoveredChar = this.positions.find((pos) => pos.position === index); // курсор указывает на персонажа
 
-    const allowedMoves = this.findMovementRadius(selectedChar?.position, selectedChar?.character.moveRadius) // доступные клетки для передвижения
-    const allowedAttack = this.findAttackRadius(selectedChar?.position, selectedChar?.character.attackRadius)// доступные клетки для атаки
+    this.allowedMovesCells = this.findMovementRadius(this.selectedChar?.position, this.selectedChar?.character.moveRadius) // доступные клетки для передвижения
+    this.allowedAttackCells = this.findAttackRadius(this.selectedChar?.position, this.selectedChar?.character.attackRadius)// доступные клетки для атаки
 
+    this.isPlayerChar = ['bowman', 'swordsman', 'magician'].includes(this.hoveredChar?.character.type); //Наведение на своего игрока
+    this.isEnemyChar = ['daemon', 'undead', 'vampire'].includes(this.hoveredChar?.character.type); //Наведение на противника
     // показ подсказки
-    if (hoveredChar) {
-      const message = this.showTooltip(hoveredChar);
+    if (this.hoveredChar) {
+      const message = this.showTooltip(this.hoveredChar);
       this.gamePlay.showCellTooltip(message, index);
 
-      const isPlayerChar = ['bowman', 'swordsman', 'magician'].includes(hoveredChar.character.type); //Наведение на своего игрока
-      const isEnemyChar = ['daemon', 'undead', 'vampire'].includes(hoveredChar.character.type); //Наведение на противника
 
       //изменение курсора и появление красной обводки
-      if (isPlayerChar) {
-        if (selectedChar && selectedChar !== hoveredChar) {
+      if (this.isPlayerChar) {
+        if (this.selectedChar && this.selectedChar !== this.hoveredChar) {
           this.gamePlay.setCursor(cursors.pointer);
         } else {
           this.gamePlay.setCursor(cursors.auto);
         }
-      } else if (isEnemyChar) {
-        if (allowedAttack.has(index)) {
+      } else if (this.isEnemyChar) {
+        if (this.allowedAttackCells.has(index)) {
           this.gamePlay.selectCell(index, 'red');
           this.gamePlay.setCursor(cursors.crosshair);
         } else {
           this.gamePlay.setCursor(cursors.notallowed);
         }
       }
-      //Появление зеленой
-    } else if (selectedChar) {
-      if (allowedMoves.has(index)) {
+      //Появление зеленой обводки
+    } else if (this.selectedChar) {
+      if (this.allowedMovesCells.has(index)) {
         this.gamePlay.selectCell(index, 'green');
         this.gamePlay.setCursor(cursors.pointer);
       } else {
@@ -194,13 +202,35 @@ export default class GameController {
 
   //Определение радиуса атаки
   findAttackRadius(position, attackRadius) {
-    return this.findMovementRadius(position, attackRadius)
+    const allowedAttack = new Set();
+    const { boardSize } = this
+    const col = position % boardSize;
+    const row = Math.floor(position / boardSize);
+
+    for (let r = -attackRadius; r <= attackRadius; r++) {
+      for (let c = -attackRadius; c <= attackRadius; c++) {
+        const newRow = row + r;
+        const newCol = col + c;
+        const newPos = newRow * boardSize + newCol;
+
+        if(
+          newRow >0 && newRow <= boardSize &&
+          newCol > 0 && newCol <= boardSize &&
+          Math.abs(r)+ Math.abs(c)<= boardSize
+        ){
+          allowedAttack.add(newPos);
+        }
+
+      }
+    }
+    return allowedAttack;
   }
 
   //Покидание ячейки с игроком
   onCellLeave(index) {
     this.gamePlay.hideCellTooltip(index);
     this.gamePlay.setCursor(cursors.auto);
+    this.hoveredChar = null;
 
     if (this.selectedChar?.position !== index) {
       this.gamePlay.deselectCell(index);
@@ -212,8 +242,8 @@ export default class GameController {
     this.gamePlay.drawUi(themes.prairie); // отрисовка поля
     this.generatePositions(); // генерация позиции персонажей
     this.gamePlay.redrawPositions(this.positions); // отрисовка персонажей
-    this.tooltipStatus(); // вывод информации
-    this.showBorder();
+    this.doHoverActions(); // вывод информации
+    this.doClickActions();
     // TODO: add event listeners to gamePlay events
     // TODO: load saved stated from stateService
   }
