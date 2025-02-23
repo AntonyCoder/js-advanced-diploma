@@ -9,6 +9,6 @@ export default class GameState {
   }
 
   switchTurn(){
-    this.currentTurn = this.currentTurn === 'player' ? 'copmuter' : 'player';
+    this.currentTurn = this.currentTurn === 'player' ? 'computer' : 'player';
   }
 }

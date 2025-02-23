@@ -80,7 +80,9 @@ export default class GameController {
   onCellClick(index) {
     this.showBorder(index); //Отображение обводки 
     this.moveChar(index); //Передвижение персонажа
-    this.attackEnemy(index); // Атака противника
+    this.attackPlayer(index); // Атака противника
+    this.attackEnemy(); // Противник атакует нас
+    console.log(this.gameState.currentTurn);
   }
 
   // Отображение обводки игрока
@@ -113,18 +115,60 @@ export default class GameController {
     }
   }
 
-  //Атака противника
-  attackEnemy(index) {
+  //Мы атакуем противника
+  attackPlayer(index) {
     if (this.selectedChar && this.isEnemyChar && this.allowedAttackCells.has(index)) {
-      const damage = Math.max(this.selectedChar.character.attack - this.hoveredChar.character.defence, this.selectedChar.character.attack * 0.1)
-      this.hoveredChar.character.health -= damage;
-      const result = this.gamePlay.redrawPositions(this.positions);
-      this.gamePlay.showDamage(index, damage).then(result);
+      this.attack(this.selectedChar, this.hoveredChar);
+    }
+  }
+
+  //Вычисление атаки и отображение урона
+  attack(attacker, target) {
+    if (!attacker || !target) {
+      return
+    }
+
+    const damage = Math.max(attacker.character.attack - target.character.defence, attacker.character.attack * 0.1)
+    target.character.health -= damage;
+    this.gamePlay.showDamage(target.position, damage).then(() => {
+      if (target.character.health <= 0) {
+        this.positions = this.positions.filter(pos => pos !== target);
+      }
+      this.gamePlay.redrawPositions(this.positions);
+    });
+    
+    this.gameState.switchTurn();
+  }
+
+  //Противник атакует нас
+  attackEnemy() {
+    if (this.gameState.currentTurn === 'computer') {
+      const enemyChars = this.positions.filter(pos =>
+        ['daemon', 'undead', 'vampire'].includes(pos.character?.type));
+
+      const playerChars = this.positions.filter(pos =>
+        ['bowman', 'swordsman', 'magician'].includes(pos.character?.type));
+
+      let actionDone = false;
+
+      for (const enemy of enemyChars) {
+        for (const player of playerChars) {
+
+          const attackRadius = this.findAttackRadius(enemy.position, enemy.character.attackRadius);
+
+          if (attackRadius.has(player.position)) {
+            this.attack(enemy, player);
+            actionDone = true;
+            break;
+          }
+        }
+        if (actionDone) break;
+      }
     }
   }
 
   //Логика формирования информации об игроке
-  showTooltip(character) {
+  createMessage(character) {
     const { level, attack, defence, health } = character.character;
     const message = `🎖${level} ⚔${attack} 🛡${defence} ❤${health}`;
     return message;
@@ -141,7 +185,7 @@ export default class GameController {
     this.isEnemyChar = ['daemon', 'undead', 'vampire'].includes(this.hoveredChar?.character.type); //Наведение на противника
     // показ подсказки
     if (this.hoveredChar) {
-      const message = this.showTooltip(this.hoveredChar);
+      const message = this.createMessage(this.hoveredChar);
       this.gamePlay.showCellTooltip(message, index);
 
 
@@ -169,10 +213,6 @@ export default class GameController {
         this.gamePlay.setCursor(cursors.notallowed);
       }
     }
-  }
-
-  createMessage() {
-
   }
 
   // Определение радиуса передвижение
@@ -213,11 +253,7 @@ export default class GameController {
         const newCol = col + c;
         const newPos = newRow * boardSize + newCol;
 
-        if(
-          newRow >0 && newRow <= boardSize &&
-          newCol > 0 && newCol <= boardSize &&
-          Math.abs(r)+ Math.abs(c)<= boardSize
-        ){
+        if (newRow >= 0 && newRow < boardSize && newCol >= 0 && newCol < boardSize) {
           allowedAttack.add(newPos);
         }
 
@@ -242,8 +278,8 @@ export default class GameController {
     this.gamePlay.drawUi(themes.prairie); // отрисовка поля
     this.generatePositions(); // генерация позиции персонажей
     this.gamePlay.redrawPositions(this.positions); // отрисовка персонажей
-    this.doHoverActions(); // вывод информации
-    this.doClickActions();
+    this.doHoverActions(); // действия при наведении
+    this.doClickActions(); // действия при нажатии
     // TODO: add event listeners to gamePlay events
     // TODO: load saved stated from stateService
   }
