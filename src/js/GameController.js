@@ -20,6 +20,8 @@ export default class GameController {
     this.gameState = new GameState();
     this.selectedChar = null;
     this.hoveredChar = null;
+    this.currentThemeIndex = 0;
+    this.themes = [themes.prairie, themes.desert, themes.arctic, themes.mountain];
   }
 
   //Генерация позиций игроков
@@ -82,7 +84,6 @@ export default class GameController {
     this.moveChar(index); //Передвижение персонажа
     this.attackPlayer(index); // Атака противника
     this.attackEnemy(); // Противник атакует нас
-    console.log(this.gameState.currentTurn);
   }
 
   // Отображение обводки игрока
@@ -96,7 +97,7 @@ export default class GameController {
           this.gamePlay.deselectCell(pos.position);
         }
       }
-    } else if (this.isEnemyChar && !this.allowedAttackCells) {
+    } else if (this.isEnemyChar && !this.selectedChar) {
       GamePlay.showError('Это персонаж противника!');
     }
   }
@@ -125,34 +126,39 @@ export default class GameController {
   //Вычисление атаки и отображение урона
   attack(attacker, target) {
     if (!attacker || !target) {
-      return
+      return;
     }
 
     const damage = Math.max(attacker.character.attack - target.character.defence, attacker.character.attack * 0.1)
     target.character.health -= damage;
     this.gamePlay.showDamage(target.position, damage).then(() => {
-      if (target.character.health <= 0) {
-        this.positions = this.positions.filter(pos => pos !== target);
+      this.positions = this.positions.filter(pos => pos.character.health > 0); // удаляем игроков у которых здоровье = 0
+
+      if (this.selectedChar?.character.health <= 0) {
+        this.gamePlay.deselectCell(this.selectedChar.position);
+        this.selectedChar = null;
       }
+
       this.gamePlay.redrawPositions(this.positions);
+      this.checkEndGame();
     });
-    
+
     this.gameState.switchTurn();
   }
 
   //Противник атакует нас
   attackEnemy() {
-    if (this.gameState.currentTurn === 'computer') {
-      const enemyChars = this.positions.filter(pos =>
-        ['daemon', 'undead', 'vampire'].includes(pos.character?.type));
+    this.enemyChars = this.positions.filter(pos =>
+      ['daemon', 'undead', 'vampire'].includes(pos.character?.type));
 
-      const playerChars = this.positions.filter(pos =>
-        ['bowman', 'swordsman', 'magician'].includes(pos.character?.type));
+    this.playerChars = this.positions.filter(pos =>
+      ['bowman', 'swordsman', 'magician'].includes(pos.character?.type));
+    if (this.gameState.currentTurn === 'computer') {
 
       let actionDone = false;
 
-      for (const enemy of enemyChars) {
-        for (const player of playerChars) {
+      for (const enemy of this.enemyChars) {
+        for (const player of this.playerChars) {
 
           const attackRadius = this.findAttackRadius(enemy.position, enemy.character.attackRadius);
 
@@ -165,6 +171,42 @@ export default class GameController {
         if (actionDone) break;
       }
     }
+  }
+
+  // Проверка окончания раунда игры
+  checkEndGame() {
+    this.enemyChars = this.positions.filter(pos =>
+      ['daemon', 'undead', 'vampire'].includes(pos.character?.type));
+    if (this.enemyChars.length === 0) {
+      this.selectedChar = null
+      this.nextLevel();
+      this.levelUp();
+    }
+  }
+
+  // Повышение уровня 
+  levelUp() {
+    this.positions.forEach((item) => {
+      item.character.level += 1;
+      item.character.health = Math.min(100, item.character.health + 80)
+      item.character.defence = Math.max(item.character.defence, item.character.defence * (80 + item.character.health) / 100);
+      item.character.attack = Math.max(item.character.attack, item.character.attack * (80 + item.character.health) / 100);
+    })
+    this.gamePlay.redrawPositions(this.positions)
+  }
+
+  // Следующий уровень игры
+  nextLevel() {
+    this.currentThemeIndex = (this.currentThemeIndex + 1) % this.themes.length
+    this.gamePlay.drawUi(this.themes[this.currentThemeIndex]);
+
+    const aliveChar = this.positions.filter((pos) => {
+      ['bowman', 'swordsman', 'magician'].includes(pos.character?.type)
+    })
+
+    this.positions = [...aliveChar]
+    this.generatePositions();
+    this.gamePlay.redrawPositions(this.positions);
   }
 
   //Логика формирования информации об игроке
