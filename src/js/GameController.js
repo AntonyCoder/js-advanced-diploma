@@ -22,6 +22,8 @@ export default class GameController {
     this.hoveredChar = null;
     this.currentThemeIndex = 0;
     this.themes = [themes.prairie, themes.desert, themes.arctic, themes.mountain];
+    this.playerTeamSize = 3;  // Начальный размер команды игрока
+    this.enemyTeamSize = 3;   // Начальный размер команды противника
   }
 
   //Генерация позиций игроков
@@ -29,8 +31,8 @@ export default class GameController {
     const playerTypes = [Bowman, Swordsman, Magician];
     const enemyTypes = [Daemon, Undead, Vampire];
 
-    const playerTeam = generateTeam(playerTypes, 3, 3);
-    const enemyTeam = generateTeam(enemyTypes, 3, 3);
+    const playerTeam = generateTeam(playerTypes, this.playerTeamSize, this.playerTeamSize);
+    const enemyTeam = generateTeam(enemyTypes, this.enemyTeamSize, this.enemyTeamSize);
 
     const occupiedPositions = new Set();
 
@@ -196,12 +198,14 @@ export default class GameController {
       item.character.health = Math.min(100, item.character.health + 80)
       item.character.defence = Math.max(item.character.defence, item.character.defence * (80 + item.character.health) / 100);
       item.character.attack = Math.max(item.character.attack, item.character.attack * (80 + item.character.health) / 100);
+
     })
     this.gamePlay.redrawPositions(this.positions)
   }
 
   // Следующий уровень игры
   nextLevel() {
+
     if (this.checkGameOver()) return;
     this.currentThemeIndex = (this.currentThemeIndex + 1) % this.themes.length;
     this.gamePlay.drawUi(this.themes[this.currentThemeIndex]);
@@ -210,7 +214,14 @@ export default class GameController {
       ['bowman', 'swordsman', 'magician'].includes(pos.character?.type)
     )
     console.log(aliveChar);
-    this.positions = [...aliveChar]
+    // this.positions = [...aliveChar]
+
+    this.playerTeamSize += 1;
+    this.enemyTeamSize += 1;
+    this.currentThemeIndex = (this.currentThemeIndex + 1) % this.themes.length
+    this.gamePlay.drawUi(this.themes[this.currentThemeIndex]);
+
+    this.positions = []
     this.generatePositions();
     this.gamePlay.redrawPositions(this.positions);
   }
