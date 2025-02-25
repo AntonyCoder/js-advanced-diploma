@@ -80,6 +80,7 @@ export default class GameController {
 
   //Действия при нажатии на клетку
   onCellClick(index) {
+    if (this.isGameOver) return;
     this.showBorder(index); //Отображение обводки 
     this.moveChar(index); //Передвижение персонажа
     this.attackPlayer(index); // Атака противника
@@ -134,13 +135,14 @@ export default class GameController {
     this.gamePlay.showDamage(target.position, damage).then(() => {
       this.positions = this.positions.filter(pos => pos.character.health > 0); // удаляем игроков у которых здоровье = 0
 
-      if (this.selectedChar?.character.health <= 0) {
+      if (this.selectedChar && this.selectedChar.character.health <= 0) {
         this.gamePlay.deselectCell(this.selectedChar.position);
         this.selectedChar = null;
       }
 
       this.gamePlay.redrawPositions(this.positions);
       this.checkEndGame();
+      if (this.checkGameOver()) return
     });
 
     this.gameState.switchTurn();
@@ -175,10 +177,13 @@ export default class GameController {
 
   // Проверка окончания раунда игры
   checkEndGame() {
+    if (this.checkGameOver()) return;
+
     this.enemyChars = this.positions.filter(pos =>
-      ['daemon', 'undead', 'vampire'].includes(pos.character?.type));
-    if (this.enemyChars.length === 0) {
-      this.selectedChar = null
+      ['daemon', 'undead', 'vampire'].includes(pos.character?.type)
+    )
+    if (!this.enemyChars.length) {
+      this.selectedChar = null;
       this.nextLevel();
       this.levelUp();
     }
@@ -197,13 +202,14 @@ export default class GameController {
 
   // Следующий уровень игры
   nextLevel() {
-    this.currentThemeIndex = (this.currentThemeIndex + 1) % this.themes.length
+    if (this.checkGameOver()) return;
+    this.currentThemeIndex = (this.currentThemeIndex + 1) % this.themes.length;
     this.gamePlay.drawUi(this.themes[this.currentThemeIndex]);
 
-    const aliveChar = this.positions.filter((pos) => {
+    const aliveChar = this.positions.filter(pos =>
       ['bowman', 'swordsman', 'magician'].includes(pos.character?.type)
-    })
-
+    )
+    console.log(aliveChar);
     this.positions = [...aliveChar]
     this.generatePositions();
     this.gamePlay.redrawPositions(this.positions);
@@ -218,6 +224,7 @@ export default class GameController {
 
   // Наведение на ячейку с игроком
   onCellEnter(index) {
+    if (this.isGameOver) return;
     this.hoveredChar = this.positions.find((pos) => pos.position === index); // курсор указывает на персонажа
 
     this.allowedMovesCells = this.findMovementRadius(this.selectedChar?.position, this.selectedChar?.character.moveRadius) // доступные клетки для передвижения
@@ -306,6 +313,7 @@ export default class GameController {
 
   //Покидание ячейки с игроком
   onCellLeave(index) {
+    if (this.isGameOver) return;
     this.gamePlay.hideCellTooltip(index);
     this.gamePlay.setCursor(cursors.auto);
     this.hoveredChar = null;
@@ -313,6 +321,33 @@ export default class GameController {
     if (this.selectedChar?.position !== index) {
       this.gamePlay.deselectCell(index);
     }
+  }
+
+  //Завершение игры при победе или проигрыше
+  checkGameOver() {
+    const aliveChar = this.positions.filter(pos =>
+      ['bowman', 'swordsman', 'magician'].includes(pos.character?.type)
+    )
+
+    if (aliveChar.length === 0) {
+      this.blockField();
+      GamePlay.showMessage('К сожалению в проиграли!');
+      return true;
+    }
+
+    if (this.currentThemeIndex > 3) {
+      this.blockField();
+      GamePlay.showMessage('Поздравляем, вы прошли игру!');
+      return true;
+    }
+
+    return false;
+  }
+
+  // Блокировка игрового поля при проигрыше или прохождении 4 уровней
+  blockField() {
+    this.isGameOver = true;
+    this.gamePlay.setCursor(cursors.notallowed)
   }
 
   //Запуск игры
