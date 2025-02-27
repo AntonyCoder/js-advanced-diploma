@@ -42,9 +42,7 @@ test('Проверка атаки персонажа Vampire', () => {
     const result = game.findAttackRadius(position, vampire.attackRadius);
 
     const expected = new Set([
-        8, 16,
-        1, 2,
-        9, 18,
+        0, 10, 17, 8, 16, 1, 2, 9, 18,
     ]);
 
     expect(result).toEqual(expected)
@@ -60,7 +58,7 @@ test('Проверка движения персонажа Undead', () => {
 
     const expected = new Set([
         19, 26, 28, 35,
-        18, 20, 34, 36
+        18, 20, 34, 36, 27
     ]);
 
     expect(result).toEqual(expected);

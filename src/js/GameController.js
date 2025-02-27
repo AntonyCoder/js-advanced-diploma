@@ -417,6 +417,37 @@ export default class GameController {
     this.gamePlay.redrawPositions(this.positions); // перерисовываем персонажей
   }
 
+  saveGame() {
+    this.gameState.positions = this.positions;
+    this.gameState.currentLevel = this.currentLevel;
+    this.gameState.currentThemeIndex = this.currentThemeIndex;
+    this.gameState.playerTeamSize = this.playerTeamSize;
+    this.gameState.enemyTeamSize = this.enemyTeamSize;
+
+    this.stateService.save(this.gameState);
+    GamePlay.showMessage('Игра сохранена!');
+  }
+
+  loadGame() {
+    try {
+      const loadedState = this.stateService.load();
+      if (loadedState) {
+        this.gameState = GameState.from(loadedState);
+        this.positions = this.gameState.positions;
+        this.currentLevel = this.gameState.currentLevel;
+        this.currentThemeIndex = this.gameState.currentThemeIndex;
+        this.playerTeamSize = this.gameState.playerTeamSize;
+        this.enemyTeamSize = this.gameState.enemyTeamSize;
+
+        this.gamePlay.drawUi(this.themes[this.currentThemeIndex]);
+        this.gamePlay.redrawPositions(this.positions);
+        GamePlay.showMessage('Игра загружена!');
+      }
+    } catch (e) {
+      GamePlay.showError('Invalid state');
+    }
+  }
+
   //Запуск игры
   init() {
     this.gamePlay.drawUi(themes.prairie); // отрисовка поля
@@ -425,7 +456,7 @@ export default class GameController {
     this.doHoverActions(); // действия при наведении
     this.doClickActions(); // действия при нажатии
     this.gamePlay.addNewGameListener(this.startNewGame.bind(this));
-    // TODO: add event listeners to gamePlay events
-    // TODO: load saved stated from stateService
+    this.gamePlay.addSaveGameListener(this.saveGame.bind(this));
+    this.gamePlay.addLoadGameListener(this.loadGame.bind(this));
   }
 }
