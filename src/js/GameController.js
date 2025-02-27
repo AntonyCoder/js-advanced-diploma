@@ -401,6 +401,22 @@ export default class GameController {
     this.gamePlay.setCursor(cursors.notallowed)
   }
 
+  startNewGame() {
+    this.gameState = new GameState(); // сброс состояния игры
+    this.positions = [];
+    this.selectedChar = null;
+    this.hoveredChar = null;
+    this.isGameOver = false;
+    this.currentLevel = 1;
+    this.currentThemeIndex = 0;
+    this.playerTeamSize = 3;
+    this.enemyTeamSize = 3;
+
+    this.gamePlay.drawUi(themes.prairie); // заново отрисовываем поле
+    this.generatePositions(); // генерируем позиции игроков
+    this.gamePlay.redrawPositions(this.positions); // перерисовываем персонажей
+  }
+
   //Запуск игры
   init() {
     this.gamePlay.drawUi(themes.prairie); // отрисовка поля
@@ -408,6 +424,7 @@ export default class GameController {
     this.gamePlay.redrawPositions(this.positions); // отрисовка персонажей
     this.doHoverActions(); // действия при наведении
     this.doClickActions(); // действия при нажатии
+    this.gamePlay.addNewGameListener(this.startNewGame.bind(this));
     // TODO: add event listeners to gamePlay events
     // TODO: load saved stated from stateService
   }
