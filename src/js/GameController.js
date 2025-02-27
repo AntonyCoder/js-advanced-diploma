@@ -24,6 +24,8 @@ export default class GameController {
     this.themes = [themes.prairie, themes.desert, themes.arctic, themes.mountain];
     this.playerTeamSize = 3;  // Начальный размер команды игрока
     this.enemyTeamSize = 3;   // Начальный размер команды противника
+    this.isGameOver = false;
+    this.currentLevel = 1;
   }
 
   //Генерация позиций игроков
@@ -205,25 +207,63 @@ export default class GameController {
 
   // Следующий уровень игры
   nextLevel() {
-
     if (this.checkGameOver()) return;
+
+    this.currentLevel += 1;
+
     this.currentThemeIndex = (this.currentThemeIndex + 1) % this.themes.length;
     this.gamePlay.drawUi(this.themes[this.currentThemeIndex]);
 
     const aliveChar = this.positions.filter(pos =>
       ['bowman', 'swordsman', 'magician'].includes(pos.character?.type)
     )
-    console.log(aliveChar);
-    // this.positions = [...aliveChar]
 
     this.playerTeamSize += 1;
     this.enemyTeamSize += 1;
-    this.currentThemeIndex = (this.currentThemeIndex + 1) % this.themes.length
-    this.gamePlay.drawUi(this.themes[this.currentThemeIndex]);
 
-    this.positions = []
-    this.generatePositions();
+    const newPlayers = generateTeam([Bowman, Swordsman, Magician], this.playerTeamSize, this.playerTeamSize - aliveChar.length);
+    const newEnemies = generateTeam([Daemon, Undead, Vampire], this.enemyTeamSize, this.enemyTeamSize);
+
+    const occupiedPositions = new Set();
+    aliveChar.forEach(pos => occupiedPositions.add(pos.position));
+
+    function getPlayerPosition() {
+      let pos;
+      do {
+        const row = Math.floor(Math.random() * 8);
+        const col = Math.floor(Math.random() * 2);
+        pos = row * 8 + col;
+      } while (occupiedPositions.has(pos));
+      occupiedPositions.add(pos);
+      return pos;
+    }
+
+    function getEnemyPosition() {
+      let pos;
+      do {
+        const row = Math.floor(Math.random() * 8);
+        const col = 6 + Math.floor(Math.random() * 2);
+        pos = row * 8 + col;
+      } while (occupiedPositions.has(pos));
+      occupiedPositions.add(pos);
+      return pos;
+    }
+
+    newPlayers.characters.forEach((char) => {
+      const position = getPlayerPosition();
+      aliveChar.push(new PositionedCharacter(char, position));
+    });
+
+    const newEnemiesPositions = [];
+    newEnemies.characters.forEach((char) => {
+      const position = getEnemyPosition();
+      newEnemiesPositions.push(new PositionedCharacter(char, position));
+    });
+
+    this.positions = [...aliveChar, ...newEnemiesPositions];
+
     this.gamePlay.redrawPositions(this.positions);
+
   }
 
   //Логика формирования информации об игроке
@@ -346,7 +386,7 @@ export default class GameController {
       return true;
     }
 
-    if (this.currentThemeIndex > 3) {
+    if (this.currentLevel > 4) {
       this.blockField();
       GamePlay.showMessage('Поздравляем, вы прошли игру!');
       return true;
